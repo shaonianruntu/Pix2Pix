@@ -1,4 +1,4 @@
-./sample
-./checkpoints
-./__pycache__
-./.idea
+sample
+checkpoints
+__pycache__
+.idea
