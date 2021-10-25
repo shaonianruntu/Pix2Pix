@@ -9,7 +9,7 @@ def new_P(x, re, flag):
         if re[x][i] != 0 and flag[i] == 0:
             flag[i] = 1
             tal = tal + 1
-            new_P(i, re, flag);
+            new_P(i, re, flag)
 
 
 if __name__ == '__main__':
@@ -27,4 +27,4 @@ if __name__ == '__main__':
     flag = np.zeros(7)
     flag[5] = 1
     new_P(a, relation, flag)
-    print tal
+    print(tal)

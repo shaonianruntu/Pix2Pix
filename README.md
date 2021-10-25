@@ -1,12 +1,19 @@
 # pix2pix-pytorch
 
-simplify junyanz.pytorch-CycleGAN-and-pix2pix with zero padding
+Update of [junyanz.pytorch-CycleGAN-and-pix2pix](https://github.com/jehovahxu/pix2pix-pytorch), which is a simplify junyanz.pytorch-CycleGAN-and-pix2pix with zero padding base on **PyTorch** and **Python3**.
 
-run train
+Pix2Pix is a classical supervised image translation model.
+
+## Train 
 ```
-python train2.py --dataroot {dataset} --datalist {datalist}
+./train.sh
 ```
 
-|   Dataset| fid  |PSNR|FSIM|
-|  :----: | :----: |:----:|:----:|
-|  CUHK  | 28.15|30.30|0.728|
+## Test
+```
+./test.sh
+```
+
+| Dataset |  fid  | PSNR  | FSIM  |
+| :-----: | :---: | :---: | :---: |
+|  CUHK   | 28.15 | 30.30 | 0.728 |

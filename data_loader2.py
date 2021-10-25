@@ -1,15 +1,3 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-# @File  : data_loader2.py
-# @Author: Jehovah
-# @Date  : 18-7-30
-# @Desc  : 
-
-
-
-"""
-load data
-"""
 import random
 import torch
 import torch.utils.data as data
@@ -20,10 +8,18 @@ import os.path
 import numpy as np
 import scipy.io as sio
 
-
-IMG_EXTEND = ['.jpg', '.JPG', '.jpeg', '.JPEG',
-              '.png', '.PNG', '.ppm', '.PPM', '.bmp', '.BMP',
-              ]
+IMG_EXTEND = [
+    '.jpg',
+    '.JPG',
+    '.jpeg',
+    '.JPEG',
+    '.png',
+    '.PNG',
+    '.ppm',
+    '.PPM',
+    '.bmp',
+    '.BMP',
+]
 
 
 def is_img_file(filename):
@@ -56,15 +52,15 @@ def mat_process(img_fl):
 def make_dataset(dir, file):
     imgA = []
     imgB = []
-
     file = os.path.join(dir, file)
+
     fimg = open(file, 'r')
     for line in fimg:
         line = line.strip('\n')
         line = line.rstrip()
         word = line.split("||")
-        imgA.append(os.path.join(dir, word[0]))
-        imgB.append(os.path.join(dir, word[1]))
+        imgA.append(os.path.join(dir, word[0].lstrip('/')))
+        imgB.append(os.path.join(dir, word[1].lstrip('/')))
 
     return imgA, imgB
 
@@ -74,13 +70,19 @@ def default_loader(path):
 
 
 class MyDataset(data.Dataset):
-    def __init__(self, opt, isTrain=0, transform=None, return_paths=None, loader=default_loader):
+    def __init__(self,
+                 opt,
+                 isTrain=0,
+                 transform=None,
+                 return_paths=None,
+                 loader=default_loader):
         super(MyDataset, self).__init__()
         self.opt = opt
         imgs = make_dataset(self.opt.dataroot, self.opt.datalist)
         if len(imgs) == 0:
-            raise (RuntimeError("Found 0 images in: " + self.opt.dataroot + dir + "\n"
-                                                                         "Supported image extensions are: " +
+            raise (RuntimeError("Found 0 images in: " + self.opt.dataroot +
+                                dir + "\n"
+                                "Supported image extensions are: " +
                                 ",".join(IMG_EXTEND)))
 
         self.isTrain = isTrain
@@ -93,49 +95,79 @@ class MyDataset(data.Dataset):
         path_A = self.imgs[0][index]
         path_B = self.imgs[1][index]
 
-        imgA = Image.open(path_A).convert('RGB')
-        # imgB = Image.open(path_B).convert('RGB')
-        imgB = Image.open(path_B).convert('L')
+        if self.opt.input_nc == 3:
+            imgA = Image.open(path_A).convert('RGB')
+        elif self.opt.input_nc == 1:
+            imgA = Image.open(path_A).convert('L')
+
+        if self.opt.output_nc == 3:
+            imgB = Image.open(path_B).convert('RGB')
+        elif self.opt.output_nc == 1:
+            imgB = Image.open(path_B).convert('L')
+
         if self.isTrain == 0:
 
             w, h = imgA.size
-            pading_w = (self.opt.loadSize - w) / 2
-            pading_h = (self.opt.loadSize - h) / 2
-            padding = transforms.Pad((pading_w, pading_h), fill=0, padding_mode='constant')
+            pading_w = (self.opt.loadSize - w) // 2
+            pading_h = (self.opt.loadSize - h) // 2
+            padding = transforms.Pad((pading_w, pading_h),
+                                     fill=0,
+                                     padding_mode='constant')
             # padding = transforms.Pad((pading_w, pading_h), padding_mode='edge')
             i = random.randint(0, self.opt.loadSize - self.opt.fineSize)
             j = random.randint(0, self.opt.loadSize - self.opt.fineSize)
 
-            imgA = self.process_img(imgA, i, j, padding)
-            imgB = self.process_img(imgB, i, j, padding)
+            if self.opt.input_nc == 3:
+                imgA = self.process_img(imgA, i, j, padding, mode='RGB')
+            elif self.opt.input_nc == 1:
+                imgA = self.process_img(imgA, i, j, padding, mode='L')
 
+            if self.opt.output_nc == 3:
+                imgB = self.process_img(imgB, i, j, padding, mode='RGB')
+            elif self.opt.output_nc == 1:
+                imgB = self.process_img(imgB, i, j, padding, mode='L')
 
         else:
 
             w, h = imgA.size
-            pading_w = (self.opt.fineSize - w) / 2
-            pading_h = (self.opt.fineSize - h) / 2
-            padding = transforms.Pad((pading_w, pading_h), fill=0, padding_mode='constant')
+            pading_w = (self.opt.fineSize - w) // 2
+            pading_h = (self.opt.fineSize - h) // 2
+            padding = transforms.Pad((pading_w, pading_h),
+                                     fill=0,
+                                     padding_mode='constant')
             # padding = transforms.Pad((pading_w, pading_h), padding_mode='edge')
             imgA = padding(imgA)
             imgB = padding(imgB)
 
             imgA = transforms.ToTensor()(imgA)
             imgB = transforms.ToTensor()(imgB)
-            imgA = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))(imgA)
-            imgB = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))(imgB)
+
+            if self.opt.input_nc == 3:
+                imgA = transforms.Normalize((0.5, 0.5, 0.5),
+                                            (0.5, 0.5, 0.5))(imgA)
+            elif self.opt.input_nc == 1:
+                imgA = transforms.Normalize(0.5, 0.5)(imgA)
+
+            if self.opt.output_nc == 3:
+                imgB = transforms.Normalize((0.5, 0.5, 0.5),
+                                            (0.5, 0.5, 0.5))(imgB)
+            elif self.opt.output_nc == 1:
+                imgB = transforms.Normalize(0.5, 0.5)(imgB)
 
         return imgA, imgB
 
     def __len__(self):
         return len(self.imgs[1])
 
-    def process_img(self, img, i, j,padding):
+    def process_img(self, img, i, j, padding, mode='RGB'):
         img = padding(img)
         img = img.crop((j, i, j + self.opt.fineSize, i + self.opt.fineSize))
         img = transforms.ToTensor()(img)
         # if self.isTrain == 0:
-        img = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))(img)
+        if mode == 'RGB':
+            img = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))(img)
+        else:
+            img = transforms.Normalize(0.5, 0.5)(img)
         return img
 
     def process_parsing(self, mat_path, i, j, w, h):
@@ -145,7 +177,7 @@ class MyDataset(data.Dataset):
         parsing = np.minimum(parsing, 1)
         parsing = np.maximum(parsing, 0)
         parsing = np.pad(parsing, ((0, 0), (w, w), (h, h)), 'edge')
-        parsing = parsing[:, i:i+self.opt.fineSize, j:j+self.opt.fineSize]
+        parsing = parsing[:, i:i + self.opt.fineSize, j:j + self.opt.fineSize]
         # parsing = np.where(parsing > 0.5, 1, 0)  # 二值化parsing
 
         parsing = parsing.astype('float32')
