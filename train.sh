@@ -1,1 +1,1 @@
-python train2.py --dataroot /data/fangnan/photostick --datalist CUHK/list_train.txt --gpuid 0 | tee train.log
+python train.py --dataroot /data/fangnan/photostick --datalist CUHK/list_train.txt --gpu 0 | tee train.log

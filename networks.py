@@ -1,3 +1,4 @@
+# 模型参数
 import torch
 import torch.nn as nn
 
@@ -5,7 +6,7 @@ import torch.nn as nn
 class Generator(nn.Module):
     def __init__(self, input_nc, output_nc, ngf=64):
         super(Generator, self).__init__()
-        #256*256
+        # 256*256
         self.en1 = nn.Sequential(
             nn.Conv2d(input_nc, ngf, kernel_size=4, stride=2, padding=1),
             nn.LeakyReLU(0.2, True))
@@ -86,7 +87,7 @@ class Generator(nn.Module):
                                padding=1), nn.Tanh())
 
     def forward(self, x):
-        #encoder
+        # encoder
         out_en1 = self.en1(x)
         out_en2 = self.en2(out_en1)
         out_en3 = self.en3(out_en2)
@@ -95,7 +96,7 @@ class Generator(nn.Module):
         out_en6 = self.en6(out_en5)
         out_en7 = self.en7(out_en6)
         out_en8 = self.en8(out_en7)
-        #decoder
+        # decoder
         out_de1 = self.de1(out_en8)
         out_de1 = torch.cat((out_de1, out_en7), 1)
         out_de2 = self.de2(out_de1)
@@ -143,3 +144,13 @@ class Discriminator(nn.Module):
         out_cov4 = self.cov4(out_cov3)
         out = self.cov5(out_cov4)
         return out
+
+
+def weights_init(m):
+    classname = m.__class__.__name__
+    if classname.find("Conv") != -1:
+        m.weight.data.normal_(0.0, 0.02)
+        m.bias.data.fill_(0)
+    elif classname.find("BatchNorm2d") != -1:
+        m.weight.data.normal_(1.0, 0.02)
+        m.bias.data.fill_(0)

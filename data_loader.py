@@ -1,12 +1,12 @@
+# 模型参数
+import os
 import random
+import numpy as np
+import scipy.io as sio
+from PIL import Image
 import torch
 import torch.utils.data as data
 import torchvision.transforms as transforms
-from PIL import Image
-import os
-import os.path
-import numpy as np
-import scipy.io as sio
 
 IMG_EXTEND = [
     '.jpg',
@@ -71,16 +71,16 @@ def default_loader(path):
 
 class MyDataset(data.Dataset):
     def __init__(self,
-                 opt,
+                 args,
                  isTrain=0,
                  transform=None,
                  return_paths=None,
                  loader=default_loader):
         super(MyDataset, self).__init__()
-        self.opt = opt
-        imgs = make_dataset(self.opt.dataroot, self.opt.datalist)
+        self.args = args
+        imgs = make_dataset(self.args.dataroot, self.args.datalist)
         if len(imgs) == 0:
-            raise (RuntimeError("Found 0 images in: " + self.opt.dataroot +
+            raise (RuntimeError("Found 0 images in: " + self.args.dataroot +
                                 dir + "\n"
                                 "Supported image extensions are: " +
                                 ",".join(IMG_EXTEND)))
@@ -95,73 +95,85 @@ class MyDataset(data.Dataset):
         path_A = self.imgs[0][index]
         path_B = self.imgs[1][index]
 
-        if self.opt.input_nc == 3:
-            imgA = Image.open(path_A).convert('RGB')
-        elif self.opt.input_nc == 1:
-            imgA = Image.open(path_A).convert('L')
-
-        if self.opt.output_nc == 3:
-            imgB = Image.open(path_B).convert('RGB')
-        elif self.opt.output_nc == 1:
-            imgB = Image.open(path_B).convert('L')
+        imgA = self.load_img(path_A, self.args.input_nc)
+        imgB = self.load_img(path_B, self.args.output_nc)
 
         if self.isTrain == 0:
 
-            w, h = imgA.size
-            pading_w = (self.opt.loadSize - w) // 2
-            pading_h = (self.opt.loadSize - h) // 2
-            padding = transforms.Pad((pading_w, pading_h),
-                                     fill=0,
-                                     padding_mode='constant')
-            # padding = transforms.Pad((pading_w, pading_h), padding_mode='edge')
-            i = random.randint(0, self.opt.loadSize - self.opt.fineSize)
-            j = random.randint(0, self.opt.loadSize - self.opt.fineSize)
+            imgA = self.load_padding(imgA)
+            imgB = self.load_padding(imgB)
 
-            if self.opt.input_nc == 3:
-                imgA = self.process_img(imgA, i, j, padding, mode='RGB')
-            elif self.opt.input_nc == 1:
-                imgA = self.process_img(imgA, i, j, padding, mode='L')
+            imgA, imgB = self.random_crop(imgA, imgB)
 
-            if self.opt.output_nc == 3:
-                imgB = self.process_img(imgB, i, j, padding, mode='RGB')
-            elif self.opt.output_nc == 1:
-                imgB = self.process_img(imgB, i, j, padding, mode='L')
+            imgA = self.normalize(imgA, self.args.input_nc)
+            imgB = self.normalize(imgB, self.args.output_nc)
 
         else:
 
-            w, h = imgA.size
-            pading_w = (self.opt.fineSize - w) // 2
-            pading_h = (self.opt.fineSize - h) // 2
-            padding = transforms.Pad((pading_w, pading_h),
-                                     fill=0,
-                                     padding_mode='constant')
-            # padding = transforms.Pad((pading_w, pading_h), padding_mode='edge')
-            imgA = padding(imgA)
-            imgB = padding(imgB)
+            imgA = self.fine_padding(imgA)
+            imgB = self.fine_padding(imgB)
 
-            imgA = transforms.ToTensor()(imgA)
-            imgB = transforms.ToTensor()(imgB)
-
-            if self.opt.input_nc == 3:
-                imgA = transforms.Normalize((0.5, 0.5, 0.5),
-                                            (0.5, 0.5, 0.5))(imgA)
-            elif self.opt.input_nc == 1:
-                imgA = transforms.Normalize(0.5, 0.5)(imgA)
-
-            if self.opt.output_nc == 3:
-                imgB = transforms.Normalize((0.5, 0.5, 0.5),
-                                            (0.5, 0.5, 0.5))(imgB)
-            elif self.opt.output_nc == 1:
-                imgB = transforms.Normalize(0.5, 0.5)(imgB)
+            imgA = self.normalize(imgA, self.args.input_nc)
+            imgB = self.normalize(imgB, self.args.output_nc)
 
         return imgA, imgB
 
     def __len__(self):
         return len(self.imgs[1])
 
+    def load_img(self, path, nc):
+        if nc == 3:
+            img = Image.open(path).convert('RGB')
+        else:
+            img = Image.open(path).convert('L')
+        return img
+
+    def load_padding(self, img):
+        transform = transforms.Compose([
+            transforms.Resize((self.args.img_height, self.args.img_width)),
+            transforms.Pad((self.args.load_pad_w, self.args.load_pad_h),
+                           fill=0,
+                           padding_mode='constant'),
+        ])
+        img = transform(img)
+        return img
+
+    def fine_padding(self, img):
+        transform = transforms.Compose([
+            transforms.Resize((self.args.img_height, self.args.img_width)),
+            transforms.Pad((self.args.fine_pad_w, self.args.fine_pad_h),
+                           fill=0,
+                           padding_mode='constant'),
+        ])
+        img = transform(img)
+        return img
+
+    def random_crop(self, imgA, imgB):
+        i = random.randint(0, self.args.fill_h)
+        j = random.randint(0, self.args.fill_w)
+        imgA = imgA.crop(
+            (j, i, j + self.args.fine_size, i + self.args.fine_size))
+        imgB = imgB.crop(
+            (j, i, j + self.args.fine_size, i + self.args.fine_size))
+        return imgA, imgB
+
+    def normalize(self, img, nc=3):
+        if nc == 3:
+            transform = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
+            ])
+        else:
+            transform = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize(mean=0.5, std=0.5)
+            ])
+        img = transform(img)
+        return img
+
     def process_img(self, img, i, j, padding, mode='RGB'):
         img = padding(img)
-        img = img.crop((j, i, j + self.opt.fineSize, i + self.opt.fineSize))
+        img = img.crop((j, i, j + self.args.fineSize, i + self.args.fineSize))
         img = transforms.ToTensor()(img)
         # if self.isTrain == 0:
         if mode == 'RGB':
@@ -177,7 +189,8 @@ class MyDataset(data.Dataset):
         parsing = np.minimum(parsing, 1)
         parsing = np.maximum(parsing, 0)
         parsing = np.pad(parsing, ((0, 0), (w, w), (h, h)), 'edge')
-        parsing = parsing[:, i:i + self.opt.fineSize, j:j + self.opt.fineSize]
+        parsing = parsing[:, i:i + self.args.fineSize,
+                          j:j + self.args.fineSize]
         # parsing = np.where(parsing > 0.5, 1, 0)  # 二值化parsing
 
         parsing = parsing.astype('float32')
